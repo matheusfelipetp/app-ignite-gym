@@ -3,14 +3,13 @@ import LogoSvg from '@assets/logo.svg';
 import { Button } from '@components/Button';
 import { Input } from '@components/Input';
 import { useNavigation } from '@react-navigation/native';
-import { AuthNavigatorRoutesProps } from '@routes/auth.routes';
 import { Center, Heading, Image, ScrollView, Text, VStack } from 'native-base';
 
-export function Signin() {
-  const navigation = useNavigation<AuthNavigatorRoutesProps>();
+export function Signup() {
+  const navigation = useNavigation();
 
-  const handleNewAccount = () => {
-    navigation.navigate('signUp');
+  const handleGoBack = () => {
+    navigation.goBack();
   };
 
   return (
@@ -36,8 +35,10 @@ export function Signin() {
 
         <Center>
           <Heading color="gray.100" fontSize="xl" mb={6} fontFamily="heading">
-            Acesse sua conta
+            Crie sua conta
           </Heading>
+
+          <Input placeholder="Nome" />
 
           <Input
             placeholder="E-mail"
@@ -47,19 +48,15 @@ export function Signin() {
 
           <Input placeholder="Senha" secureTextEntry />
 
-          <Button title="Acessar" />
+          <Button title="Criar e acessar" />
         </Center>
 
-        <Center mt={24}>
-          <Text color="gray.100" fontSize="sm" mb={3} fontFamily="body">
-            Ainda não tem acesso?
-          </Text>
-          <Button
-            title="Criar conta"
-            variant="outline"
-            onPress={handleNewAccount}
-          />
-        </Center>
+        <Button
+          title="Voltar para o login"
+          variant="outline"
+          mt={24}
+          onPress={handleGoBack}
+        />
       </VStack>
     </ScrollView>
   );
