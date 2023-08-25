@@ -3,8 +3,20 @@ import LogoSvg from '@assets/logo.svg';
 import { Button } from '@components/Button';
 import { Input } from '@components/Input';
 import { yupResolver } from '@hookform/resolvers/yup';
+import { useAuth } from '@hooks/useAuth';
 import { useNavigation } from '@react-navigation/native';
-import { Center, Heading, Image, ScrollView, Text, VStack } from 'native-base';
+import { api } from '@services/api';
+import { AppError } from '@utils/AppError';
+import {
+  Center,
+  Heading,
+  Image,
+  ScrollView,
+  Text,
+  VStack,
+  useToast,
+} from 'native-base';
+import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import * as yup from 'yup';
 
@@ -29,6 +41,8 @@ const signUpSchema = yup.object({
 });
 
 export function Signup() {
+  const [isLoading, setIsLoading] = useState(false);
+
   const {
     control,
     handleSubmit,
@@ -37,24 +51,32 @@ export function Signup() {
     resolver: yupResolver(signUpSchema),
   });
 
+  const toast = useToast();
   const navigation = useNavigation();
+  const { signIn } = useAuth();
 
   const handleGoBack = () => {
     navigation.goBack();
   };
 
-  const handleSignUp = ({
-    name,
-    email,
-    password,
-    password_confirm,
-  }: FormDataProps) => {
-    console.log({
-      name,
-      email,
-      password,
-      password_confirm,
-    });
+  const handleSignUp = async ({ name, email, password }: FormDataProps) => {
+    try {
+      setIsLoading(true);
+
+      await api.post('/users', { name, email, password });
+      await signIn(email, password);
+    } catch (error) {
+      setIsLoading(false);
+      const isAppError = error instanceof AppError;
+
+      toast.show({
+        title: isAppError
+          ? error.message
+          : 'Erro ao criar conta. Tente novamente mais tarde.',
+        placement: 'top',
+        bgColor: 'red.500',
+      });
+    }
   };
 
   return (
@@ -144,13 +166,14 @@ export function Signup() {
           <Button
             title="Criar e acessar"
             onPress={handleSubmit(handleSignUp)}
+            isLoading={isLoading}
           />
         </Center>
 
         <Button
           title="Voltar para o login"
           variant="outline"
-          mt={12}
+          mt={8}
           onPress={handleGoBack}
         />
       </VStack>
