@@ -1,6 +1,11 @@
 import { UserDTO } from '@dtos/UserDTO';
 import { api } from '@services/api';
 import {
+  storageAuthTokenGet,
+  storageAuthTokenRemove,
+  storageAuthTokenSave,
+} from '@storage/storageAuthToken';
+import {
   storageUserGet,
   storageUserRemove,
   storageUserSave,
@@ -12,6 +17,7 @@ type PropsAuthContext = {
   signIn: (email: string, password: string) => Promise<void>;
   isLoadingUserStorageData: boolean;
   signOut: () => Promise<void>;
+  updateUserProfile: (userUpdated: UserDTO) => Promise<void>;
 };
 
 type PropsAuthProvider = {
@@ -25,16 +31,44 @@ function AuthProvider({ children }: PropsAuthProvider) {
   const [isLoadingUserStorageData, setIsLoadingUserStorageData] =
     useState(true);
 
+  const userAndTokenUpdate = async (userData: UserDTO, token: string) => {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    setUser(userData);
+  };
+
+  const storageUserAndTokenSave = async (
+    userData: UserDTO,
+    token: string,
+    refresh_token: string,
+  ) => {
+    try {
+      setIsLoadingUserStorageData(true);
+
+      await storageUserSave(userData);
+      await storageAuthTokenSave({ token, refresh_token });
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsLoadingUserStorageData(false);
+    }
+  };
+
   const signIn = async (email: string, password: string) => {
     try {
       const { data } = await api.post('/sessions', { email, password });
 
-      if (data?.user) {
-        setUser(data.user);
-        storageUserSave(data.user);
+      if (data?.user && data?.token && data?.refresh_token) {
+        await storageUserAndTokenSave(
+          data.user,
+          data?.token,
+          data?.refresh_token,
+        );
+        userAndTokenUpdate(data.user, data?.token);
       }
     } catch (error) {
       throw error;
+    } finally {
+      setIsLoadingUserStorageData(false);
     }
   };
 
@@ -44,6 +78,7 @@ function AuthProvider({ children }: PropsAuthProvider) {
       setUser({} as UserDTO);
 
       await storageUserRemove();
+      await storageAuthTokenRemove();
     } catch (error) {
       throw error;
     } finally {
@@ -51,12 +86,24 @@ function AuthProvider({ children }: PropsAuthProvider) {
     }
   };
 
+  const updateUserProfile = async (userUpdated: UserDTO) => {
+    try {
+      await storageUserSave(userUpdated);
+      setUser(userUpdated);
+    } catch (error) {
+      throw error;
+    }
+  };
+
   const loadUserData = async () => {
     try {
-      const userLogged = await storageUserGet();
+      setIsLoadingUserStorageData(true);
 
-      if (userLogged) {
-        setUser(userLogged);
+      const userLogged = await storageUserGet();
+      const { token } = await storageAuthTokenGet();
+
+      if (token && userLogged) {
+        userAndTokenUpdate(userLogged, token);
       }
     } catch (error) {
       throw error;
@@ -69,9 +116,23 @@ function AuthProvider({ children }: PropsAuthProvider) {
     loadUserData();
   }, []);
 
+  useEffect(() => {
+    const subscribe = api.registerInterceptTokenManager(signOut);
+
+    return () => {
+      subscribe();
+    };
+  }, [signOut]);
+
   return (
     <AuthContext.Provider
-      value={{ user, signIn, isLoadingUserStorageData, signOut }}
+      value={{
+        user,
+        signIn,
+        isLoadingUserStorageData,
+        signOut,
+        updateUserProfile,
+      }}
     >
       {children}
     </AuthContext.Provider>
